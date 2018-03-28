@@ -1,11 +1,11 @@
-(defpackage :text-adventure-ext-systems
-  (:use :cl :text-adventure-ext-classes
-            :text-adventure)
+(defpackage :branchie-systems
+  (:use :cl :branchie-classes
+            :branchie)
   (:export
     enemy-battle-simple
     ))
 
-(in-package :text-adventure-ext-systems)
+(in-package :branchie-systems)
 
 ;NOTE: When making branch systems
 ;keep in mind that only variables in *global-game-state* hash are stored

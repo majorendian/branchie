@@ -1,6 +1,6 @@
-(defpackage :text-adventure
+(defpackage :branchie
   (:use :cl :ltk :ltk-mw :harmony-simple
-            :text-adventure-ext-classes)
+            :branchie-classes)
   (:export br 
            opt 
            choices 
@@ -53,7 +53,7 @@
   (:shadow withdraw)
   )
 
-(in-package :text-adventure)
+(in-package :branchie)
 (use-package :ltk) ;need this here so that all the symbols get imported. Otherwise we have for some reason name conflicts
 
 #+:linux (asdf:load-system :harmony-pulse)

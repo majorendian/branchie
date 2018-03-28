@@ -1,4 +1,4 @@
-(defpackage :text-adventure-ext-classes
+(defpackage :branchie-classes
   (:use :cl)
   (:export
     game-image
@@ -31,7 +31,7 @@
     find-quest
     ))
 
-(in-package :text-adventure-ext-classes)
+(in-package :branchie-classes)
 
 (defclass game-image ()
   ((posx :accessor gi-posx :initarg :x :initform 0)

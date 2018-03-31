@@ -36,6 +36,7 @@
     display-point-set-x
     display-point-set-y
 
+    *display-mutex*
     init-display
     display
     display-canvas
@@ -53,6 +54,7 @@
     display-draw-characters
     display-draw-image
     display-handle-animation
+    display-render-stack
 
     image-cache-preload-gc
     ))
@@ -230,24 +232,20 @@
 
 ;----------------------------------------------------------------------
 
+(defparameter *display-mutex* (sb-thread:make-mutex :name "display-mutex"))
+
 (defclass display ()
   ((canvas :reader display-canvas :initarg :canvas)
    (width :reader display-width :initarg :width :initform nil)
    (height :reader display-height :initarg :height :initform nil)
-   ;internal attributes
-   (text-position :accessor display-text-position :initarg :text-position :initform (make-instance 'display-point :x 0 :y 0))
-   (image :accessor display-image :initarg :image :initform (make-image))
-   (imagepath :accessor display-imagepath :initarg :imagepath :initform nil)
-   (characters :accessor display-characters :initarg :characters :initform (list))
-   (options-frame-container :accessor display-opt-frame :initarg :opt-frame :initform nil)
-   (instance-variables :accessor display-iv :initarg :iv :initform (make-hash-table))
+   (image-stack :accessor display-stack :initarg :stack :initform (list))
    ))
 
-(defmethod display-set-var ((d display) (varname symbol) val)
-  (setf (gethash varname (display-iv d)) val))
+(defmethod display-push ((d display) (imgpath pathname))
+  (push (image-cache imgpath) (display-stack d)))
 
-(defmethod display-get-var ((d display) (varname symbol))
-  (gethash varname (display-iv d)))
+(defmethod display-push ((d display) (gi game-image))
+  (push (image-cache gi) (display-stack d)))
 
 (defmethod init-display ((c canvas))
   (configure c
@@ -258,37 +256,15 @@
                                   :canvas c 
                                   :width (parse-integer (cget c :width)) 
                                   :height (parse-integer (cget c :height))
-                                  :opt-frame (make-instance 'frame :master c))))
-    (display-set-var dinstance 'aux-point (make-instance 'display-point :x 0 :y 0))
+                                  )))
     dinstance))
 
-(defmethod display-center-text-x ((d display))
-  (setf (display-point-x (display-text-position d)) (floor (/ (display-width d) 2)))
-  (format t "text-position x: ~A~%" (display-point-x (display-text-position d))))
-
-(defmethod display-center-text-y ((d display))
-  (setf (display-point-y (display-text-position d)) (floor (/ (display-height d) 2)))
-  )
-
-(defmethod display-draw-text ((d display) (text string))
+(defmethod display-draw-text ((d display) (text string) x y)
   (format-wish "~A create text ~A ~A -font myDefaultFont -text ~S"
                (widget-path (display-canvas d))
-               (display-point-x (display-text-position d))
-               (display-point-y (display-text-position d))
+               x
+               y
                text))
-
-(defmethod display-draw-text-frame ((d display) (f frame))
-  "Draws a frame widget near the bottom of the canvas display.
-   This depends on the widgets size so adjustments might be necessary.
-   D is the main game display canvas.
-   F is a frame expected to contain some sort of text.
-   Frames are positioned from top-left corner as opposed to
-   just text which is positioned from the center."
-  (create-window (display-canvas d)
-                 ;(floor (/ (display-point-x (display-text-position d)) 2))
-                 20
-                 (floor (/ (display-point-y (display-text-position d)) 1.05))
-                 f))
 
 (defmethod display-clear ((d display))
   (clear (display-canvas d))
@@ -316,50 +292,6 @@
                options
                ))
 
-(defmethod display-draw-image ((d display) imagepath x y) ;imagepath can be nil
-  ;NOTE: make sure we don't unnecessarily load the same image multiple times
-  (labels ((wish-draw-image ()
-             (format-wish "~a create image ~a ~a -image ~a" 
-                          (widget-path (display-canvas d)) 
-                          ;divide the width and height by 2 because the image is being drawn from the center not from top-left
- ;                         (/ (display-width d) 2) 
- ;                         (/ (display-height d) 2)
-                          x
-                          y
-                          (widget-path (display-image d)))
-             ))
-    (if imagepath
-      (progn
-        (cond
-          ((or (null (display-imagepath d)) (not (uiop:pathname-equal imagepath (display-imagepath d))) )
-           (progn
-             (format t "Loading image: ~S~%" imagepath)
-             (image-load (display-image d) imagepath)
-             (setf (display-imagepath d) imagepath)
-             (wish-draw-image)))
-          ((uiop:pathname-equal imagepath (display-imagepath d)) (wish-draw-image))
-          (t nil))
-        )
-      ;esle if imgpath evals to false
-      (if (and (display-imagepath d) (display-image d))
-        (wish-draw-image))) ;if we have the imagepath and image defined
-    ;(create-image (display-canvas d) 0 0 :image *current-branch-image*)
-    )
-  )
-
-(defmethod display-redraw-current-image ((d display))
-  (display-draw-image d (display-imagepath d) (/ (display-width d) 2) (/ (display-height d) 2)))
-
-(defmethod display-draw-image-slide-in ((d display) imagepath)
-  (loop for i from -320 to 320
-        do (progn
-             (display-clear d)
-             (display-draw-image d imagepath 
-                                 i
-                                 (/ (display-height d) 2)
-                                 )
-             (sleep 0.001))))
-
 (defmethod display-wish-draw-image ((d display) (imgpath string) &optional x y)
   (let ((cached_image (image-cache imgpath)))
     (format-wish "~a create image ~a ~a -image ~a" 
@@ -380,6 +312,16 @@
 
 (defmethod display-wish-draw-image ((d display) (gc game-character) &optional x y)
   (display-wish-draw-image d (gc-gi gc) x y))
+
+(defmethod display-draw-image-slide-in ((d display) imagepath)
+  (loop for i from -320 to 320
+        do (progn
+             (display-clear d)
+             (display-draw-image d imagepath 
+                                 i
+                                 (/ (display-height d) 2)
+                                 )
+             (sleep 0.001))))
 
 (defmethod display-draw-image-shake-x ((d display) imagepath)
   (let* ((img (image-cache imagepath))
@@ -404,7 +346,7 @@
                (setq c (+ c 1))
               ; (format t "flipdir:~S x:~S~%" flipdir x)
                (display-clear d)
-               (display-redraw-current-image d) ;redraw background image
+               ;(display-redraw-current-image d) ;redraw background image
                (display-wish-draw-image d imagepath x)))
            (sleep timestep)))))
 
@@ -421,25 +363,18 @@
 (defmethod display-center-y ((d display))
   (floor (/ (display-height d) 2)))
 
-(defmethod display-handle-animation ((d display) animation imgpath )
+(defmethod display-handle-animation ((d display) anim imgpath )
   (cond 
-    ((eql :slide animation) (display-draw-image-slide-in d imgpath))
-    ((null animation) (display-draw-image d imgpath (/ (display-width d) 2) (/ (display-height d) 2)))))
+    ((null anim) (display-wish-draw-image d imgpath (/ (display-width d) 2) (/ (display-height d) 2)))
+    ((eql anim :slide) (display-draw-image-slide-in d imgpath))
+    ((eql anim :shake) (display-draw-image-shake-x d gc))
+    ((eql anim :attack) (display-wish-draw-image d gc))
+    ((eql anim :overlay) (display-wish-draw-image d gc (display-center-x d) (display-center-y d)))
+    ((eql anim :red-flash) (display-effect-silly d))
+    ))
 
-(defmethod display-draw-characters ((d display) (actors list))
-  (labels ((animate-character (pair)
-             (let ((gc (first pair))
-                   (anim (second pair)))
-               (format t "Animating ~S with ~S~%" (gc-name gc) anim)   
-               (cond
-                 ((null anim) (display-wish-draw-image d gc))
-                 ((eql anim :shake) (display-draw-image-shake-x d gc))
-                 ((eql anim :attack) (display-wish-draw-image d gc))
-                 ((eql anim :overlay) (display-wish-draw-image d gc (display-center-x d) (display-center-y d)))
-                 ((eql anim :red-flash) (display-effect-silly d))
-                 )
-               )))
-    (map 'nil #'animate-character actors)))
+(defmethod display-render-pair ((d display) (pair list))
+  (display-handle-animation d (first pair) (second pair)))
 
 (defmethod display-effect-silly ((d display))
   (loop
@@ -457,3 +392,11 @@
              (display-point-set-y (display-get-var d 'aux-point) 0)
              (return)))
          (sleep 0.02))))
+
+(defmethod display-render-stack ((d display))
+  (display-clear d)
+  (loop for pair = (pop (display-stack d))
+        while pair
+        do (progn
+             (display-render-pair d pair))))
+

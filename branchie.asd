@@ -14,5 +14,8 @@
   :author "Ernest Deák <gordon.zar@gmail.com>"
   :license "BSD 2-Clause License"
   :components ((:file "branchie-classes")
-               (:file "branchie" :depends-on ("branchie-classes"))
-               (:file "branchie-systems" :depends-on ("branchie-classes" "branchie"))))
+               (:file "branchie-utils")
+               (:file "branchie-sound")
+               (:file "branchie" :depends-on ("branchie-classes" "branchie-ui" "branchie-utils"))
+               (:file "branchie-systems" :depends-on ("branchie-classes" "branchie"))
+               (:file "branchie-ui")))

@@ -1,6 +1,9 @@
 (defpackage :branchie
-  (:use :cl :ltk :ltk-mw :harmony-simple
-            :branchie-classes)
+  (:use :cl :ltk :ltk-mw 
+            :branchie-classes
+            :branchie-ui
+            :branchie-utils
+            :branchie-sound)
   (:export br 
            opt 
            choices 
@@ -33,22 +36,16 @@
            clear-branch-stack
            reset-all-branches
            goto
-           play-music
-           play-sfx
-           stop-music
-           set-default-bg-music
            root-branch
            set-gold-theme
            set-dark-theme
-           quit-game
            ;helpfull functions
            join
            join-nl
            ;other configurations
-           set-character-sfx
-           set-bg-music
-           set-text-draw-speed
            set-debug
+           ;aux
+           text-entry-autocomplete
            )
   (:shadow withdraw)
   )
@@ -61,7 +58,6 @@
 ;(setf ltk:*wish-pathname* "/home/tino/Lab/Binaries/IronTcl/bin/wine64-wish.sh")
 
 
-
 (defstruct opt-pair 
   (opt-text nil) ;choice text to matcha against when processing user input
   (opt-branch)) ;actual branch in question associated with the option text
@@ -69,15 +65,11 @@
 (defstruct branch 
   (name nil) ;branch id
   (next nil)
-  (bshadow nil) ;boolean value to check if this is a shadow branch or a regular branch
   (text nil) ;text to display on the branch
   (text-options nil) ;options for the branch, created by macro "choices"
-  (hint nil) ;a hint for the player if available so that they can figure out things if they are stuck
   (br-func nil) ;function to execute when entering the branch
-  (image nil) ;image associated with this branch
-  (characters (list))
-  (animation nil)
-  (variables nil)) ;a hashmap of branch-bound variables (like leaves)
+  (images (list)) ;image associated with this branch
+  )
 
 (defparameter *start-branch* nil) ;starting branch for "/reset"
 (defun root-branch () *start-branch*)
@@ -102,7 +94,6 @@
 (defun set-debug (v)
   (setf *text-adventure-debug* v))
 
-(defparameter *game-music-source* nil) ;populated on first play
 
 ;global table of branches
 (defparameter *branch-table* (make-hash-table))
@@ -139,54 +130,16 @@
 
 ;--- Configurable variables ---
 
-(defparameter *window-icon* "data/img/icon.gif")
-(defparameter *header-image* "data/img/header.gif")
-
-(defparameter *character-sfx-file* #p"data/sound/char-sfx-1.mp3")
-(defmethod set-character-sfx ((soundfile_mp3 pathname))
-  (setf *character-sfx-file* soundfile_mp3))
-(defparameter *default-bg-music* #p"data/sound/Seedling.mp3") ;Seedling.mp3 has been created by Walid Feghali
-(defmethod set-bg-music ((soundfile_mp3 pathname))
-  (setf *default-bg-music* soundfile_mp3))
 
 (defparameter *gametitle* "untitled")
 
 ;------------------------------
-(defparameter *current-bg-music* nil)
-
-;--- In game settings ---
-
-(defparameter *text-draw-speed* 20)
-(defmethod set-text-draw-speed ((tds fixnum))
-  (setf *text-draw-speed* tds))
-(defparameter *text-sfx-enabled* t)
-(defparameter *music-enabled* t)
-(defparameter *sfx-enabled* t)
-
 
 ;--- helper functions ---------
 (defparameter *branch-label-counter* -1)
 (defun generate-branch-label ()
   (setf *branch-label-counter* (+ 1 *branch-label-counter*))
   (format nil "BR~a" *branch-label-counter*))
-
-(defun join (sep l)
-  (declare (type list l))
-  "Joins a list of strings together with a separator recursively"
-  (when (characterp sep)
-    (setq sep (format nil "~a" sep)))
-
-  (when (not sep)
-    (setq sep ",")) ;set default value for separator if not defined
-  
-  (when (not (cdr l))
-    (setq sep "")) ;remove separator if this is the end of the list
-  (if l
-    (concatenate 'string (car l) sep (join sep (cdr l)))
-    ""))
-
-(defmacro join-nl (&rest l)
-  `(join #\Newline (list ,@l)))
 
 ;-------------------------------
 
@@ -243,11 +196,9 @@
   (let ((_actionf nil)
         (_choices nil)
         (_branch_name nil)
-        (_image nil)
-        (_characters nil)
+        (_images nil)
         (_next nil)
         (_skip_register nil)
-        (_animation nil)
         (i 0))
     (loop for e in r
           ;Old-fashioned index-style loop
@@ -255,15 +206,13 @@
                (cond
                  ((eql e :action) (setq _actionf (nth (+ 1 i) r)))
                  ((eql e :name) (setq _branch_name (nth (+ 1 i) r)))
-                 ((eql e :image) (setq _image (nth (+ 1 i) r)))
-                 ((eql e :characters) (setq _characters (nth (+ 1 i) r)))
+                 ((eql e :images) (setq _images (nth (+ 1 i) r)))
                  ((eql e :next) (setq _next (nth (+ 1 i) r)))
                  ((eql e :skip-register) (setq _skip_register (nth (+ 1 i) r)))
-                 ((eql e :animation ) (setq _animation (nth (+ 1 i) r)))
                  ((functionp e) (continue))
                  ((and (listp e) (typep (first e) 'opt-pair)) (setf _choices (macroexpand e))))
                (setq i (+ 1 i))
-               (format t "Characters:~S~%" _characters)))
+               ))
     (let ((b
              (make-branch 
                :name (if (not _branch_name) (read-from-string (generate-branch-label)) _branch_name)
@@ -271,12 +220,7 @@
                ;The IF condition fixes an issue of a required terminating NIL when no choices are provided or only keyword args are supplied
                :text-options (if (functionp _choices) nil _choices) 
                :br-func _actionf
-               :hint nil
-               :variables (make-hash-table)
-               :characters (if (listp _characters) _characters (list _characters))
-               :image _image
-               :bshadow nil
-               :animation _animation
+               :images _images
                :next _next ;_next should be a symbol referencing another branch
                )))
       (if (not _skip_register)
@@ -300,17 +244,14 @@
   "Lazy evaluation so that the text can change based on variables within it."
   (funcall (slot-value b 'text)))
 
-(defmethod br-animation ((b branch))
-  (slot-value b 'animation))
-
 (defmethod br-next ((b branch))
   (slot-value b 'next))
 
-(defmethod br-image ((b branch))
-  (slot-value b 'image))
+(defmethod br-images ((b branch))
+  (slot-value b 'images))
 
-(defmethod br-characters ((b branch))
-  (slot-value b 'characters))
+(defmethod br-name ((b branch))
+  (slot-value b 'name))
 
 ;--- opt related ---
 
@@ -415,32 +356,6 @@
   (string= (string-downcase (format nil "~a" (slot-value b1 'name)))
            (string-downcase (format nil "~a" (slot-value b2 'name)))))
 
-(defun compile-game-tree (start_br)
-  "Evaluates all branches recursively"
-  (labels ((traverse-options (optlist)
-             (if optlist
-               (progn
-                 (format t "Compiling:~S~%" (first optlist))
-                 ;this gets/evaluates the opt-branch portion of the opt-pair
-                 (let ((compiled_branch (get-branch-of-opt-pair (first optlist))))
-                   (when (or (stringp compiled_branch) (symbolp compiled_branch))
-                     (return-from traverse-options nil))
-                   (if (or
-                         (compare-branch-names *start-branch* compiled_branch)
-                         (compare-branch-names start_br compiled_branch)
-                         )
-                     (return-from traverse-options nil)
-                     (progn
-                       (traverse-options (rest optlist))
-                       (compile-game-tree compiled_branch)))) 
-                 )))) 
-    (if (slot-value start_br 'text-options)
-      (progn
-        (traverse-options (slot-value start_br 'text-options))
-        ))))
-
-(defmacro goto (branch_name)
-  `(get-branch-by-name-from-table ,branch_name))
 
 ;--- from stackoverflow: https://stackoverflow.com/questions/26045442/copy-hash-table-in-lisp
 ;Name has been modified
@@ -473,10 +388,8 @@
       :text (slot-value branch 'text)
       :text-options (clone-choices (slot-value branch 'text-options))
       :br-func (slot-value branch 'br-func)
-      :hint (slot-value branch 'hint)
-      :image (slot-value branch 'image)
-      :characters (slot-value branch 'characters)
-      :variables (copy-hash-table (slot-value branch 'variables)))))
+      :images (slot-value branch 'images)
+      )))
 
 
 (defun clone-choices (l) ;traverse and copy choices along with their respective branches
@@ -496,155 +409,6 @@
         collect (slot-value opt 'opt-text))))
 
 ;==== Stylization ====
-(defun setup-window-icon ()
-  (handler-case
-    (let ((game-window-icon (make-image)))
-      (image-load game-window-icon *window-icon*)
-      (format-wish "wm iconphoto ~A -default ~A" (widget-path *tk*) (widget-path game-window-icon)))
-    (condition () (progn (format t "Tk/Tcl wish server not running.") (abort))))) 
-
-(defun setup-font ()
-  "Sets up fonts for the current window"
-  (send-wish "font create myDefaultFont -family \"Monospace\" -size 11")
-  (send-wish "option add *font myDefaultFont")
-  )
-
-(defun set-dark-theme (text-widget)
-  (declare (type (or nil text) text-widget))
-  "Sets the widget colors to a more darker theme."
-  (handler-case (progn
-                  (send-wish "ttk::style configure TFrame -background black")
-                  (send-wish ". configure -background black")
-                  (send-wish "ttk::style configure TLabel -background black")
-                  (send-wish "ttk::style configure TLabel -foreground lightgrey")
-                  (send-wish "ttk::style map TLabel -background [list disabled darkgrey readonly white]")
-                  (send-wish "ttk::style map TLabel -foreground [list disabled darkgrey readonly white]")
-                  ;(send-wish "ttk::style configure TScrollbar -background black")
-                  ;(send-wish "ttk::style configure TScrollbar -throughcolor black")
-                  ;(send-wish "ttk::style configure TScrollbar -arrowcolor grey")
-                  ;(send-wish "ttk::style configure TScrollbar -bordercolor grey")
-                  ;(send-wish "ttk::style configure TScrollbar -darkcolor black")
-                  ;(send-wish "ttk::style configure TScrollbar -lightcolor white")
-                  (send-wish "ttk::style configure TSeparator -background black")
-                  ;    (send-wish "ttk::style map TScrollbar -background [list active white disabled black]")
-                  ;    (send-wish "ttk::style map TScrollbar -foreground [list active white disabled black]")
-                  ;    (send-wish "ttk::style map TScrollbar -arrowblack [list active white disabled black]")
-                  (send-wish "ttk::style configure TEntry -background black")
-                  (send-wish "ttk::style configure TEntry -foreground black")
-                  (send-wish "ttk::style configure TEntry -selectforeground lightgrey")
-                  (send-wish "ttk::style configure TEntry -selectbackground grey")
-                  (send-wish "ttk::style configure TEntry -fieldbackground darkgrey")
-                  (send-wish "ttk::style map TEntry -background [list disabled darkgrey readonly darkgrey]")
-                  (send-wish "ttk::style map TEntry -foreground [list disabled darkgrey readonly darkgrey]")
-                  (send-wish "ttk::style map TEntry -fieldbackground [list disabled darkgrey readonly darkgrey]")
-                  (when text-widget
-                    (progn
-                      (configure text-widget :background "black" :foreground "white")))
-                  )
-    (condition (c) (progn
-                     (format t "An error occured while setting theme.~%Error:~S~%Tk/Tcl wish server is probably not running~%Aborting~%" c)
-                     (abort)))))
-
-
-(defun set-gold-theme (&optional text-widget)
-  "Sets the widgets colors to a golden theme."
-  (handler-case (progn
-                  (send-wish "ttk::style configure TFrame -background #ADAD52")
-                  (send-wish ". configure -background #ADAD52")
-                  (send-wish "ttk::style configure TLabel -background #ADAD52")
-                  (send-wish "ttk::style configure TLabel -foreground black")
-                  (send-wish "ttk::style map TLabel -background [list disabled #ADAD52 readonly #4D4D3D]")
-                  (send-wish "ttk::style map TLabel -foreground [list disabled #ADAD52 readonly #4D4D3D]")
-                  (send-wish "ttk::style configure TScrollbar -background #D9D473")
-                  (send-wish "ttk::style configure TScrollbar -throughcolor #ADAD52")
-                  (send-wish "ttk::style configure TScrollbar -arrowcolor #ADAD52")
-                  (send-wish "ttk::style configure TScrollbar -bordercolor #ADAD52")
-                  (send-wish "ttk::style configure TScrollbar -darkcolor #ADAD52")
-                  (send-wish "ttk::style configure TScrollbar -lightcolor #ADAD52")
-                  (send-wish "ttk::style configure TSeparator -background #ADAD52")
-                  (send-wish "ttk::style map TScrollbar -background [list active #FAF6AE disabled #D9D473]")
-                  (send-wish "ttk::style map TScrollbar -foreground [list active #ADAD52 disabled #D9D473]")
-                  (send-wish "ttk::style map TScrollbar -arrowblack [list active #ADAD52 disabled #D9D473]")
-                  (send-wish "ttk::style configure TEntry -background #4D4D3D")
-                  (send-wish "ttk::style configure TEntry -foreground #4D4D3D")
-                  (send-wish "ttk::style configure TEntry -selectforeground #4D4D3D")
-                  (send-wish "ttk::style configure TEntry -selectbackground #D9D473")
-                  (send-wish "ttk::style configure TEntry -fieldbackground #D9D473")
-                  (send-wish "ttk::style map TEntry -background [list disabled darkgrey readonly darkgrey]")
-                  (send-wish "ttk::style map TEntry -foreground [list disabled darkgrey readonly darkgrey]")
-                  (send-wish "ttk::style map TEntry -fieldbackground [list disabled darkgrey readonly darkgrey]")
-                  (when text-widget
-                    (progn
-                      (configure text-widget :background "#D9D473" :foreground "#4D4D3D")))
-                  )
-    (condition (c) (progn
-                     (format t "An error occured while setting theme.~%Error:~S~%Tk/Tcl wish server is probably not running~%Aborting~%" c)
-                     (abort)))))
-
-
-;===================================================================================
-
-(defun show-help () 
-  "Show a help window containing instructions on how to play the game."
-  ;TODO: make a show-hint function simmilar to this function which will show hints (if any) for the current branch
-  ;for the player to proceed.
-  (progn
-    (let* ((tl (make-instance 'toplevel))
-           (f (make-instance 'frame
-                             :master tl))
-           (l (make-instance 'label
-                             :master f))
-           )
-      (pack f :padx 0 :pady 0)
-      (pack l :side :top :padx 7 :pady 7 :fill :x)
-      (configure f
-                 :borderwidth 20)
-      (setf (text l) (join (format nil "~%")
-                           (list
-                             "To play the game, type your response into the input field then press ENTER."
-                             "You can use TAB to autocomplete your response."
-                             "You can also use TAB to cycle through all the options."
-                             "======================== Commands ========================="
-                             "Type '/exit' or '/quit' to close the program."
-                             "Type '/back' to go back 1 screen"
-                             "Type '/toggle_txt_sfx' to toggle text sound effects on/off"
-                             "Type '/toggle_music' to turn music on/off"
-                             "Type '/wm_mode_fullscreen' to go into fullscreen mode"
-                             "Type '/wm_mode_windowed' to go into windowed mode"
-                             "Type '/save' to save the game at any time"
-                             "Type '/load' to load the game at any time"
-                             "==========================================================="
-                             "There may be exceptions as to where you can save/load the game."
-                             "Press ESC to close any window.")
-                           ))
-      (wm-title tl "Help")
-      (bind tl "<Key-Escape>" (lambda (evt) (declare (ignore evt)) (destroy tl))))))
-
-(defun really-quit? ()
-  (let* ((tl (make-instance 'toplevel))
-         (f (make-instance 'frame
-                           :master tl))
-         (l (make-instance 'label
-                           :master f))
-         )
-    (pack f :padx 0 :pady 0)
-    (pack l :side :top :padx 7 :pady 7 :fill :x)
-    (configure f
-               :borderwidth 20)
-    (setf (text l) (join (format nil "~%")
-                         (list
-                           "Really quit?"
-                           "Press ESC to close the window."
-                           "Press ENTER to quit."
-                           )
-                         ))
-    (wm-title tl "Really quit?")
-    (bind tl "<Key-Escape>" (lambda (evt) (declare (ignore evt)) (destroy tl)))
-    (bind tl "<Key-Return>" (lambda (evt) (declare (ignore evt)) (exit-wish)))))
-
-(defun quit-game ()
-  (if *wish*
-    (exit-wish)))
 
 (defun core-commands (userinput command-lambda-pairs &key main)
   (declare (type string userinput) (type list command-lambda-pairs) (type function main))
@@ -664,74 +428,6 @@
       retval
       (funcall main))))
 
-(defun play-character-sfx ()
-  (let ((sound_source (harmony-simple:play *character-sfx-file* :master)))
-    (setf (harmony-simple:volume sound_source) 0.05)
-    ))
-
-(defun play-sfx (sfx)
-  (declare (type pathname sfx))
-  (when *sfx-enabled*
-    (let ((sound_source (harmony-simple:play sfx :master :loop nil)))
-      (setf (harmony-simple:volume sound_source) 0.05)
-      )))
-
-(defun play-music (filepath)
-  (declare (type pathname filepath))
-  "FILEPATH is a path to a file in the form #p\"filepath\"
-  Stops music on *GAME-MUSIC-SOURCE* and plays the music given in FILEPATH."
-  (when *game-music-source*
-    (harmony-simple:stop *game-music-source*))
-  (when *music-enabled*
-    (setf *game-music-source* (harmony-simple:play filepath :music :loop t))
-    (setf (harmony-simple:volume *game-music-source*) 0.5))
-  (setf *current-bg-music* filepath))
-
-(defun set-default-bg-music (filepath)
-  "Sets the default background music specified by FILEPATH
-   for the gmaescript"
-  (declare (type pathname filepath))
-  (setf *default-bg-music* filepath))
-
-(defun stop-music ()
-  "Stop all music on *GAME-MUSIC-SOURCE*"
-  (when *game-music-source*
-    (progn
-      (handler-case
-        (harmony-simple:stop *game-music-source*)
-        (harmony-pulse:pulse-error () (abort))))))
-
-(defun set-textbox-text (tbox str &optional skip-ahead) ;used in #'advance-branch to set the text of the scrollable text area
-  (declare (type scrolled-text tbox) (type string str) (type (or nil t) skip-ahead))
-  "Animate the display of text in the given textbox."
-  (configure (textbox tbox) :state :normal)
-  (setf (text tbox) "")
-  (if (not skip-ahead)
-    (loop for c in (coerce str 'list) do
-          (progn
-            ;(when (string-equal "~" c) (setq c (format nil "~%"))) ;if there is a "~" in the string, treat it as a new line
-            ;play soundeffect for each letter excluding whitespace
-            (when *text-sfx-enabled* 
-              (if (not (string= c " ")) (play-character-sfx)))
-            (configure (textbox tbox) :state :normal)
-            (append-text tbox c)
-            (configure (textbox tbox) :state :disabled) 
-            (see (textbox tbox) :end) 
-            (let ((ev (read-event :blocking nil)))
-              (if (string-equal (write-to-string (nth 5 ev)) "RETURN")
-                (progn
-                  (configure (textbox tbox) :state :normal)
-                  (setf (text tbox) str)
-                  (configure (textbox tbox) :state :disabled)
-                  (return))
-                (progn 
-                  (sleep (/ 1 *text-draw-speed*))
-                  )
-                ))
-            ))
-    ;else skip ahead
-    (setf (text tbox) str))
-  (configure (textbox tbox) :state :disabled))
 
 (defun trigger-branch-action (br &optional userinput)
   (declare (type branch br))
@@ -769,8 +465,8 @@
                        :if-does-not-exist :create
                        :element-type '(unsigned-byte 8))
 
-    (set-glob-var 'current-branch (slot-value cur_b 'name))
-    (set-glob-var 'current-image (write-to-string (slot-value cur_b 'image)))
+    (set-glob-var 'current-branch (br-name cur_b))
+    (set-glob-var 'current-images (br-images cur_b))
     (_print_hash *global-game-state*)
     (write-sequence (conspack:encode *global-game-state*) str)))
 
@@ -910,13 +606,13 @@
   "Resets everything. Intended for game restarts and game overs."
   (setf *start-branch* (deep-copy-branch *start-branch-deep-copy*)))
 
-(defun text-entry-autocomplete (branch input-str)
-  (declare (type branch branch) (type string input-str))
+(defun text-entry-autocomplete (options input-str)
+  (declare (type list options) (type string input-str))
   "Option autocompletion for the entry input field.
    Autocompletes/Cycles through options of BRANCH given the string INPUT-STR"
   (let* ((i 0)
          (next-opt-flag nil)
-         (all_options (concatenate 'list (available-options-of branch) *commands-for-autocomplete*))
+         (all_options (concatenate 'list options *commands-for-autocomplete*))
          (result
            (loop for option-text in all_options
                  do (progn
@@ -924,7 +620,7 @@
                       (cond
                         ((string= (string-downcase option-text) (string-downcase input-str))
                          (progn
-                           (format t "text equals option:~A=~A~%" option-text input-str)
+                           ;(format t "text equals option:~A=~A~%" option-text input-str)
                            (if (string= option-text (car (last all_options))) ;if this is the last element
                              (return (first all_options)))
                            (setq next-opt-flag t)
@@ -952,30 +648,16 @@
 (defparameter *branch-display-mutex* (sb-thread:make-mutex :name "branch-display-mutex"))
 
 (defun update-main-display (d br)
-  ;clear the screen
-  (display-clear d)
-  ;check for animation parameters
-  ;animate main branch image accordingly
-  (display-handle-animation d (br-animation br) (br-image br))
-  (display-draw-characters d (slot-value br 'characters))
-  ;(display-effect-silly d)
+  (display-render-stack d)
   (display-draw-branch-options d (join " | " (available-options-of br))))
 
 (defun update-panel-display (d br)
   (display-clear d)
-  (display-draw-image d #p"data/img/tree_ascii.gif" (/ (display-width d) 2) (/ (display-height d) 2)))
+  ;(display-draw-image d #p"data/img/tree_ascii.gif" (/ (display-width d) 2) (/ (display-height d) 2))
+  )
 
 ;--- Text related widget functions ---
 
-(defun update-fields (branch entry-widget text-widget &key skip-ahead)
-  "Update the text widgets.
-   Sets the text of the main dialog box and resets the input field."
-  ;;reset every field
-  (setf (text entry-widget) "") ;also clear the entry input field
-  (set-textbox-text text-widget (br-text branch) skip-ahead) 
-  branch)
-
-;=======================================================================================================================
 
 (defun create-redraw-thread (redraw-func gbranch &key name)
   (sb-thread:make-thread (lambda (wish-stream outputstream gb)
@@ -1002,136 +684,12 @@
                          :arguments (list *wish* *standard-output* gbranch)
                          :name name))
 
-;main setup for main graphic display
-(defmethod setup-main-display ((d display))
-  (setf (display-text-position d) (make-instance 'display-point :x 0 :y (- (display-height d) 30)))
-  (display-center-text-x d))
-
-;Main window of the game
-(defun main-window (game_title game-branch &optional (theme-function #'set-gold-theme))
-  (declare (type string game_title) (type branch game-branch))
-  "The main window containing the main widgets and bindings"
-  (with-ltk ()
-    ;initialize image cache
-    (wm-title *tk* game_title)
-    ;(setf *display-image-cache* (make-hash-table))
-    (maxsize *tk* 960 540)
-    (minsize *tk* 960 540)
-    (setup-font)
-    (setup-window-icon)
-    (let* ((top_frame (make-instance 'frame
-                                     :master *tk*))
-           (f (make-instance 'frame
-                             :master *tk*))
-           (sf (make-instance 'frame
-                              :master f
-                              ))
-           (right-side-frame (make-instance 'frame
-                                            :master *tk*))
-           (side-panel-canvas (make-instance 'canvas
-                                             :master right-side-frame
-                                             :width 300
-                                             :height 480))
-           (right-gfxscreen (init-display side-panel-canvas))
-           (main-canvas (make-instance 'canvas ;This is the game display for images and other kinds of texts
-                                       :master f
-                                       :width 640
-                                       :height 360))
-
-           ;main graphics screen
-           (gfxscreen (init-display main-canvas))
-           (txt (make-instance 'scrolled-text
-                               :master sf))
-           (txt-input (make-instance 'entry
-                                     :master f))
-           ;---these 2 functions are run within other threads--- 
-           (gfxscreen-redraw-func (lambda () 
-                                    ;(when *global-game-state*
-                                     ; (image-cache-preload-gc *global-game-state*))
-                                    (update-main-display gfxscreen game-branch)  nil))
-           (right-gfxscreen-redraw-func (lambda ()
-                                          (update-panel-display right-gfxscreen game-branch)  nil))
-           ;-----------------------------------------------------
-           (confirm-input-f (lambda (&optional evt)
-                              (declare (ignore evt))
-                              (let ((prev_branch game-branch))
-                                (setf game-branch (advance-branch game-branch txt-input txt gfxscreen)) ;most logic processing happens here
-                                (when (not (eq prev_branch game-branch))
-                                  (sb-thread:join-thread
-                                    (create-redraw-thread (lambda ()
-                                                            (funcall gfxscreen-redraw-func)
-                                                            (funcall right-gfxscreen-redraw-func)
-                                                            nil) game-branch))
-                                  (update-fields game-branch txt-input txt)))
-                              ))
-           (spacing 4))
-      (pack top_frame :side :top :padx spacing :pady spacing)
-      (pack f :padx spacing :pady spacing :side :left)
-      ;right side panel
-      (pack right-side-frame :side :left :padx spacing :pady spacing)
-      (configure right-side-frame
-                 :relief :ridge
-                 :borderwidth 5)
-      (pack side-panel-canvas)
-      ;---------------
-      ;This sets up the main display redraw loop
-      (pack main-canvas :side :top)
-      (setup-main-display gfxscreen)
-
-      ;Asynchronly draw the display
-      (funcall right-gfxscreen-redraw-func)
-      ;We need to use a mutex here otherwise the WISH server might crash
-      ;due to multiple async calls
-      (sb-thread:with-mutex (*branch-display-mutex*)
-        (pack sf :expand t :side :top :padx spacing :pady spacing)
-        (pack txt :side :top :pady spacing :padx spacing)
-        (grid-forget (hscroll txt)) ;remove horizontal scroll from text area. we dont need it
-        (pack txt-input :side :top :pady spacing :padx 10)
-        (configure f
-                   :borderwidth spacing
-                   :relief :groove)
-        (configure (textbox txt) 
-                   :height 4
-                   :width 73
-                   :wrap :word)
-        (configure sf
-                   :relief :sunken
-                   :borderwidth 5)
-        (configure sf
-                   :height 50
-                   :width 100)
-        (configure txt-input
-                   :width 70)
-        (focus txt-input)
-        (funcall theme-function (textbox txt))
-        ;--- ENTER binding for text entry input ---
-        (bind txt-input "<Key-Return>" confirm-input-f)
-        ;--- TAB binding for autocomplete ---
-        (bind txt-input "<Key-Tab>" (lambda (evt)
-                                      (declare (ignore evt))
-                                      (setf (text txt-input) (text-entry-autocomplete game-branch (text txt-input)))
-                                      ;clear selection and move cursor to the end of the string
-                                      (format-wish "~a selection clear" (widget-path txt-input))
-                                      (format-wish "~a icursor end" (widget-path txt-input))
-                                      ))
-        (bind txt-input "<Control-BackSpace>" (lambda (evt)
-                                                (declare (ignore evt))
-                                                ;for simplicity sake, this just removes all text from the input field
-                                                (setf (text txt-input) "")))
-        (bind *tk* "<Key-Escape>" (lambda (evt) (declare (ignore evt)) (really-quit?)))
-        (bind *tk* "<Key-F1>" (lambda (evt) (declare (ignore evt)) (show-help)))
-        (set-textbox-text txt (br-text game-branch) t)
-        (advance-branch game-branch txt-input txt gfxscreen)
-        (trigger-branch-action game-branch)
-        (on-close *tk* (lambda () (stop-music) (exit-wish))))
-      (create-redraw-thread gfxscreen-redraw-func nil :name "main-display-thread")
-      )))
 
 
-
-(defun start-game (game_title game_branch &key (theme-func #'set-dark-theme))
-  #+:linux (harmony-simple:initialize :output-spec '(harmony-pulse:pulse-drain))
-  #-:linux (harmony-simple:initialize)
+(defun start-game (game_title game_branch &key (theme-func (lambda (&optional arg))))
+  (when (or *music-enabled* *sfx-enabled* *text-sfx-enabled*)
+    #+:linux (harmony-simple:initialize :output-spec '(harmony-pulse:pulse-drain))
+    #-:linux (harmony-simple:initialize))
   
   (setf *start-branch* game_branch)
   (setf *gametitle* game_title)
@@ -1140,7 +698,7 @@
   (setf branchie-classes::*display-image-cache* (make-hash-table)) ;prevents weird caching issues while in the REPL
   (handler-case
     (progn
-      (when *default-bg-music*
+      (when (and *default-bg-music* *music-enabled*)
         (progn
           (format t "Playing music:~S~%" *default-bg-music*)
           (play-music *default-bg-music*)))
@@ -1149,5 +707,6 @@
                (progn
                  (format t "An unexpected condition occured:~%")
                  (stop-music)
-                 (describe e))))
+                 (error e)
+                 )))
   (stop-music))

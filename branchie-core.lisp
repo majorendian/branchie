@@ -6,7 +6,10 @@
            branch-text
            branch-code
            branch-name
-           br))
+           br
+           term-loop
+           quit
+           ))
 
 (in-package :branchie-core)
 

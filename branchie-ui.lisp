@@ -246,8 +246,21 @@
                                 nil) game-branch))
       (update-fields game-branch txt-input txt))))
 
+(defun default-game-function (a_branch a_string)
+  (format t "Got branch:~S~%Got String:~S~%" a_branch a_string)
+  a_branch)
+
+(defun default-update-display-function (a_display game-branch))
+
+(defun default-update-side-panel-function (a_display game-branch))
+
 ;Main window of the game
-(defun main-window (game_title game-branch &optional (theme-function #'set-gold-theme))
+(defun main-window (game_title game-branch &optional
+                               (theme-function #'set-gold-theme) 
+                               (game-function #'default-game-function)
+                               (update-main-display-function #'default-update-main-display)
+                               (update-side-panel-function #'default-update-side-panel-function)
+                               )
   (declare (type string game_title))
   "The main window containing the main widgets and bindings"
   (with-ltk ()
@@ -287,7 +300,7 @@
            (gfxscreen-redraw-func (lambda () 
                                     ;(when *global-game-state*
                                     ; (image-cache-preload-gc *global-game-state*))
-                                    ;(update-main-display gfxscreen game-branch)
+                                    (update-main-display-function gfxscreen game-branch)
                                     nil))
            (right-gfxscreen-redraw-func (lambda ()
                                           ;(update-panel-display right-gfxscreen game-branch)
@@ -295,6 +308,7 @@
            ;-----------------------------------------------------
            (confirm-input-f (lambda (&optional evt)
                               (declare (ignore evt))
+                              (setf game-branch (game-function game-branch))
                               ))
            (spacing 4))
       (pack top_frame :side :top :padx spacing :pady spacing)

@@ -1,9 +1,16 @@
 
 (defpackage :branchie-utils
   (:use :cl)
-  (:export join join-nl))
+  (:export join join-nl
+           split-string))
 
 (in-package :branchie-utils)
+
+
+(defun split-string (str &optional (c #\Space))
+  (if (position c str)
+    (cons (subseq str 0 (position c str)) (split-string (subseq str (+ 1 (position c str)))))
+    (cons str nil)))
 
 (defun join (sep l)
   (declare (type list l))

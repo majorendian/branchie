@@ -182,7 +182,6 @@
 ;==================================================
 
 
-
 (defun br (text &rest r)
   (declare (type (or list string function) text))
   "Create a new branch with the specified TEXT and a list of option in R.
@@ -443,11 +442,6 @@
 
 (defun clear-branch-stack ()
   (setf *branch-stack* (list)))
-
-(defun split-string (str &optional (c #\Space))
-  (if (position c str)
-    (cons (subseq str 0 (position c str)) (split-string (subseq str (+ 1 (position c str)))))
-    (cons str nil)))
 
 
 (defun _print_hash (hash)

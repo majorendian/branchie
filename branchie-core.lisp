@@ -7,6 +7,7 @@
            branch-code
            branch-name
            br
+           process-branch
            term-loop
            quit
            ))

@@ -22,15 +22,16 @@
                posx posy
                ))
 
-(defun setup-textarea (master)
+(defun setup-textarea (master rows columns)
   (let ((textarea (make-instance 'scrolled-text :master master)))
     (configure (textbox textarea)
-               :height 4
-               :width 70
+               :height rows
+               :width columns
                :wrap :word
                :state :disabled)
     (grid-forget (hscroll textarea))
-    (pack textarea :fill :x :side :top)))
+    (grid-forget (vscroll textarea))
+    textarea))
 
 (defun set-textbox-text (tbox str &optional skip-ahead (draw-speed 100)) 
   (declare (type scrolled-text tbox) (type string str) (type (or nil t) skip-ahead))
@@ -63,14 +64,14 @@
     (setf (text tbox) str))
   (configure (textbox tbox) :state :disabled))
 
-(defun setup-canvas (width height)
+(defun setup-canvas (master width height)
   (let* ((main-canvas (make-instance 'canvas
-                                     :master *tk*
+                                     :master master
                                      :width width 
                                      :height height
                                      :highlightthickness 0
                                      :borderwidth 0)))
-    (pack main-canvas :side :top :fill :y)
+    (pack main-canvas :side :top :fill :y :expand t)
     main-canvas))
 
 (defun setup-font ()
@@ -115,21 +116,24 @@
                      (abort)))) () )
 
 (defun GUI (width height &key
-                  (key-handler (lambda (keychar) (format t "~a pressed~%" keychar))))
+                  (key-handler (lambda (keychar) (format t "~a pressed~%" keychar)))
+                  (redraw-func (lambda (canv textarea) (declare (ignore canv) (ignore textarea)))))
   (with-ltk ()
-    (minsize *tk* width (+ height 60))
+    (minsize *tk* width height)
     (setup-font)
-    (let* ((main-canvas (setup-canvas width height))
+    (let* (
            (outside-frame (make-instance 'frame :master *tk*))
-           (main-text (setup-textarea outside-frame)))
+           (main-canvas (setup-canvas outside-frame width height))
+           (main-text (setup-textarea main-canvas 4 100)))
       (stylize-ui (textbox main-text))
       (clear-canvas main-canvas)
-      (pack outside-frame :fill :x)
-      ;(create-window main-canvas 100 100 (make-instance 'button :text "test" :command (lambda () (format t "button pressed~%"))))
+      (create-window main-canvas
+                     (/ (parse-integer (cget main-canvas :width)) 2)
+                     (parse-integer (cget main-canvas :height)) main-text :anchor :s)
+      (pack outside-frame :fill :x :expand t)
       (bind *tk* "<Key>" (lambda (evt)
                            (declare (ignore evt))
                            (funcall key-handler (event-char evt))))
-      ;(set-textbox-text main-text "<No text supplied>" nil 10)
       (defun get-textbox ()
         main-text)
       )))

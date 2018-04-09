@@ -15,6 +15,7 @@
   :license "BSD 2-Clause License"
   :components ((:file "branchie-classes")
                (:file "branchie-core")
+               (:file "branchie-tiny-ui" :depends-on ("branchie-core"))
                (:file "branchie-utils")
                (:file "branchie-sound")
                (:file "branchie" :depends-on ("branchie-classes" "branchie-ui" "branchie-utils"))

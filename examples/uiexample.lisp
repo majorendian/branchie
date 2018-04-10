@@ -9,10 +9,10 @@
                                                                          nil)))
 
 (defun main ()
-  (GUI 960 480 :key-handler (lambda (key)
-                              (cond
-                                ((string= key "ESCAPE") (destroy (get-textarea)))
-                                ((string= key "RETURN") 
-                                 (set-textarea-text (get-textarea) (branch-text *root-branch*)))
-                                (t 
-                                 (set-textarea-text (get-textarea) (format nil "You pressed the ~a key" key)))))))
+  (GUI 960 480 :on-key (lambda (key)
+                         (cond
+                           ((string= key "ESCAPE") (destroy (get-textarea)))
+                           ((string= key "RETURN") 
+                            (set-textarea-text (get-textarea) (branch-text *root-branch*)))
+                           (t 
+                            (set-textarea-text (get-textarea) (format nil "You pressed the ~a key" key)))))))

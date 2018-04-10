@@ -1,9 +1,14 @@
 (defpackage :branchie-tiny-ui
   (:use :cl :branchie-core :ltk)
-  (:export GUI
+  (:export gui
+           quit-gui
            set-textarea-text
            get-textarea
-           redraw-function))
+           get-canvas
+           clear-canvas
+           draw-text
+           draw-textarea
+           ))
 
 (in-package :branchie-tiny-ui)
 
@@ -116,13 +121,22 @@
                      (format t "An error occured while setting theme.~%Error:~S~%Tk/Tcl wish server is probably not running~%Aborting~%" c)
                      (abort)))) () )
 
-(defun redraw-function (canv textarea)
-  (format t "Redraw~%"))
+(defun quit-gui ()
+  (loop for atimer in (sb-ext:list-all-timers)
+        do (sb-ext:unschedule-timer atimer))
+  (loop for athread in (sb-thread:list-all-threads)
+        do (sb-thread:terminate-thread athread))
+  (exit-wish))
 
+(defun get-textarea () nil)
+(defun get-canvas () nil)
+(defun draw-textarea () nil)
 
 (defun GUI (width height &key
-                  (key-handler (lambda (keychar) (format t "~a pressed~%" keychar)))
-                  (redraw-func (lambda (canv textarea) (declare (ignore canv) (ignore textarea)))))
+                  (on-key (lambda (keychar) (format t "~a pressed~%" keychar)))
+                  (on-init (lambda ()))
+                  (on-update nil)
+                  (update-interval 1))
   (with-ltk ()
     (minsize *tk* width height)
     (setup-font)
@@ -131,18 +145,28 @@
            (main-text (setup-textarea main-canvas 4 100)))
       (stylize-ui (textbox main-text))
       (clear-canvas main-canvas)
-      (create-window main-canvas
-                     (/ (parse-integer (cget main-canvas :width)) 2)
-                     (parse-integer (cget main-canvas :height)) main-text :anchor :s)
       (pack outside-frame :fill :x :expand t)
       (bind *tk* "<Key>" (lambda (evt)
-                           (declare (ignore evt))
-                           (funcall key-handler (event-char evt))))
+                           (funcall on-key (format nil "~a" (event-char evt)))))
       ;functions that expose the gui to the user
       ;-----------------------------------------
       (defun get-textarea ()
         main-text)
       (defun get-canvas ()
         main-canvas)
+      (defun draw-textarea ()
+        (create-window main-canvas
+                       (/ (parse-integer (cget main-canvas :width)) 2)
+                       (parse-integer (cget main-canvas :height)) main-text :anchor :s))
+      (draw-textarea)
       ;----------------------------------------.
+
+      ;call the init callback
+      (funcall on-init)
+      ;start off the 1 second update function
+      (when on-update
+        (sb-ext:schedule-timer (sb-ext:make-timer on-update :name "on-update-timer")
+                               0
+                               :repeat-interval update-interval))
+      (on-close *tk* (lambda () (quit-gui)))
       )))

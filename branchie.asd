@@ -18,6 +18,4 @@
                (:file "branchie-tiny-ui" :depends-on ("branchie-core"))
                (:file "branchie-utils")
                (:file "branchie-sound")
-               (:file "branchie" :depends-on ("branchie-classes" "branchie-ui" "branchie-utils"))
-               (:file "branchie-systems" :depends-on ("branchie-classes" "branchie"))
-               (:file "branchie-ui")))
+               ))

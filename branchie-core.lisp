@@ -8,6 +8,8 @@
            branch-name
            br
            process-branch
+           process-selection
+           advance-branch
            term-loop
            quit
            ))
@@ -66,6 +68,16 @@
              ((symbolp selected_branch) (gethash selected_branch *branch-table*))
              ((typep selected_branch 'branch) selected_branch)))
          (sb-int:simple-parse-error () cur_b)))))
+
+(defmethod process-selection ((cur_b branch) (selection fixnum))
+  (process-selection cur_b (write-to-string selection)))
+
+(defmethod process-selection ((cur_b branch) anything_else)
+  nil)
+
+(defun advance-branch (cur_b selection)
+  (funcall (branch-code cur_b) cur_b selection)
+  (process-selection cur_b selection))
 
 (defun process-branch (active_branch &key 
                                 (get-user-input #'read-line) 

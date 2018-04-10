@@ -65,7 +65,7 @@
                              (progn
                                (funcall (branch-code next_branch) next_branch key)
                                (clear-canvas (get-canvas))
-                               (draw-textarea)
+                               (draw-textarea (get-canvas) (get-textarea))
                                (set-textarea-text (get-textarea) (branch-text next_branch) nil 50)
                                (display-branch-options (get-canvas) next_branch)
                                (setf *current-branch* next_branch))))

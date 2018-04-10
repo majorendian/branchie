@@ -130,7 +130,10 @@
 
 (defun get-textarea () nil)
 (defun get-canvas () nil)
-(defun draw-textarea () nil)
+(defun draw-textarea (main-canvas textarea)
+  (create-window main-canvas
+                 (/ (parse-integer (cget main-canvas :width)) 2)
+                 (parse-integer (cget main-canvas :height)) textarea :anchor :s))
 
 (defun GUI (width height &key
                   (on-key (lambda (keychar) (format t "~a pressed~%" keychar)))
@@ -146,26 +149,27 @@
       (stylize-ui (textbox main-text))
       (clear-canvas main-canvas)
       (pack outside-frame :fill :x :expand t)
+
       (bind *tk* "<Key>" (lambda (evt)
-                           (funcall on-key (format nil "~a" (event-char evt)))))
+                                (funcall on-key (format nil "~a" (event-char evt)))))
+
       ;functions that expose the gui to the user
       ;-----------------------------------------
       (defun get-textarea ()
         main-text)
       (defun get-canvas ()
         main-canvas)
-      (defun draw-textarea ()
-        (create-window main-canvas
-                       (/ (parse-integer (cget main-canvas :width)) 2)
-                       (parse-integer (cget main-canvas :height)) main-text :anchor :s))
-      (draw-textarea)
+
+      (draw-textarea main-canvas main-text)
       ;----------------------------------------.
 
       ;call the init callback
       (funcall on-init)
       ;start off the 1 second update function
       (when on-update
-        (sb-ext:schedule-timer (sb-ext:make-timer on-update :name "on-update-timer")
+        (sb-ext:schedule-timer (sb-ext:make-timer (lambda ()
+                                                    (sb-sys:with-interrupts
+                                                      (funcall on-update))) :name "on-update-timer")
                                0
                                :repeat-interval update-interval))
       (on-close *tk* (lambda () (quit-gui)))

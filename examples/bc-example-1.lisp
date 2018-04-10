@@ -33,3 +33,5 @@
                                        (br (format nil "Quiting...~%Press enter to exit the program")
                                            :name 'quit-branch
                                            :code #'quit)))))))
+
+(testgame)

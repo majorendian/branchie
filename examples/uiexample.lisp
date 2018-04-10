@@ -1,6 +1,6 @@
 (require :branchie)
 (defpackage :uiexample
-  (:use :cl :branchie-tiny-ui :branchie-core :ltk))
+  (:use :cl :branchie-tiny-ui :branchie-core))
 
 (in-package :uiexample)
 
@@ -9,10 +9,14 @@
                                                                          nil)))
 
 (defun main ()
-  (GUI 960 480 :on-key (lambda (key)
-                         (cond
-                           ((string= key "ESCAPE") (destroy (get-textarea)))
-                           ((string= key "RETURN") 
-                            (set-textarea-text (get-textarea) (branch-text *root-branch*)))
-                           (t 
-                            (set-textarea-text (get-textarea) (format nil "You pressed the ~a key" key)))))))
+  (GUI 960 480 
+       :on-init (lambda ()
+                  (set-textarea-text (get-textarea) "Press any key."))
+       :on-key (lambda (key)
+                 (cond
+                   ((string= key "ESCAPE") (quit-gui))
+                   ((string= key "RETURN") 
+                    (set-textarea-text (get-textarea) (branch-text *root-branch*)))
+                   (t 
+                    (set-textarea-text (get-textarea) (format nil "You pressed the ~a key" key)))))))
+(main)

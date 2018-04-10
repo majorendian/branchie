@@ -1,12 +1,16 @@
 
 # Branchie
-Branchie is a branching-based game engine.
+Branchie is a simple 2D game engine.  
 The UI relies heavily on Tcl/Tk as it's back-bone for graphics "rendering" because it already provides
 all the widgets one could possibly want. The only problem is multithreading so if you want to use the UI provided you will need to get my fork of LTK which enables multiple threads to send commands to `wish`.
 You can find the **fork** here: [majorendian/ltk](https://github.com/majorendian/ltk)  
 If you wish to take a look at the original source, you can find it here: [herth/ltk](https://github.com/herth/ltk)
 
 To best understand what is meant by this, have a look at the examples in the examples folder.
+
+## Running the examples
+To run any of the examples in the *examples* folder, go into that folder and type `sbcl --load example-file.lisp`  
+The example should then just load and you should either see something on your terminal or a window should pop up based on the example.
 
 ## Terminal-based Hello World example
 A trivial example of a terminal-based branchie game would be as following:

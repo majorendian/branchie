@@ -1,8 +1,9 @@
 (defpackage :branchie-tiny-ui
   (:use :cl :branchie-core :ltk)
   (:export GUI
-           set-textbox-text
-           get-textbox))
+           set-textarea-text
+           get-textarea
+           redraw-function))
 
 (in-package :branchie-tiny-ui)
 
@@ -33,7 +34,7 @@
     (grid-forget (vscroll textarea))
     textarea))
 
-(defun set-textbox-text (tbox str &optional skip-ahead (draw-speed 100)) 
+(defun set-textarea-text (tbox str &optional skip-ahead (draw-speed 100)) 
   (declare (type scrolled-text tbox) (type string str) (type (or nil t) skip-ahead))
   "Animate the display of text in the given textbox."
   (configure (textbox tbox) :state :normal)
@@ -115,14 +116,17 @@
                      (format t "An error occured while setting theme.~%Error:~S~%Tk/Tcl wish server is probably not running~%Aborting~%" c)
                      (abort)))) () )
 
+(defun redraw-function (canv textarea)
+  (format t "Redraw~%"))
+
+
 (defun GUI (width height &key
                   (key-handler (lambda (keychar) (format t "~a pressed~%" keychar)))
                   (redraw-func (lambda (canv textarea) (declare (ignore canv) (ignore textarea)))))
   (with-ltk ()
     (minsize *tk* width height)
     (setup-font)
-    (let* (
-           (outside-frame (make-instance 'frame :master *tk*))
+    (let* ((outside-frame (make-instance 'frame :master *tk*))
            (main-canvas (setup-canvas outside-frame width height))
            (main-text (setup-textarea main-canvas 4 100)))
       (stylize-ui (textbox main-text))
@@ -134,6 +138,11 @@
       (bind *tk* "<Key>" (lambda (evt)
                            (declare (ignore evt))
                            (funcall key-handler (event-char evt))))
-      (defun get-textbox ()
+      ;functions that expose the gui to the user
+      ;-----------------------------------------
+      (defun get-textarea ()
         main-text)
+      (defun get-canvas ()
+        main-canvas)
+      ;----------------------------------------.
       )))

@@ -11,8 +11,8 @@
 (defun main ()
   (GUI 960 480 :key-handler (lambda (key)
                               (cond
-                                ((string= key "ESCAPE") (destroy (get-textbox)))
+                                ((string= key "ESCAPE") (destroy (get-textarea)))
                                 ((string= key "RETURN") 
-                                 (set-textbox-text (get-textbox) (branch-text *root-branch*)))
+                                 (set-textarea-text (get-textarea) (branch-text *root-branch*)))
                                 (t 
-                                 (set-textbox-text (get-textbox) (format nil "You pressed the ~a key" key)))))))
+                                 (set-textarea-text (get-textarea) (format nil "You pressed the ~a key" key)))))))

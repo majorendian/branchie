@@ -63,3 +63,5 @@
                    ((string= key "S") (setf *keydown-s* t))
                    ((string= key "D") (setf *keydown-d* t))))
        :update-interval 0.01))
+
+(main)

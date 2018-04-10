@@ -1,10 +1,14 @@
 
 # Branchie
 Branchie is a branching-based game engine.
+The UI relies heavily on Tcl/Tk as it's back-bone for graphics "rendering" because it already provides
+all the widgets one could possibly want. The only problem is multithreading so if you want to use the UI provided you will need to get my fork of LTK which enables multiple threads to send commands to `wish`.
+You can find the **fork** here: [majorendian/ltk](https://github.com/majorendian/ltk)  
+If you wish to take a look at the original source, you can find it here: [herth/ltk](https://github.com/herth/ltk)
 
 To best understand what is meant by this, have a look at the examples in the examples folder.
 
-## Hello world example
+## Terminal-based Hello World example
 A trivial example of a terminal-based branchie game would be as following:
 ```common-lisp
 (require :branchie)
@@ -48,8 +52,14 @@ The function has the following usage
 ```
 It should be self-explanatory. The `:options` key takes a list of pairs which are also lists. The first element is the text of the option and the second is either a branch or a branch name such as 'start-branch or 'quit-branch or as in the above example 'branch-name-for-jump-reference.
 
-You can define branches outside of the :options key and then just use the branch name as it is demonstrated in the *hello world* example.
+You can define branches outside of the `:options` key and then just use the branch name as it is demonstrated in the *hello world* example.
 
 The `:code` key defines a function to be run after the player enters the branch. This can be used to set variables and even change the text of the branch. Look at `bc-example-1.lisp` in the examples folder to see how that can be done.
 
 The `:name` key defines the name of the branch to be used for refrencing when jumping. In the *hello world* example a simple 'quit-branch is defined for program exit so that we don't have to write it again.
+
+
+## The UI
+The UI allows for more interaction then just reading a line from the terminal such as processing key inputs. Look at `uiexample.lisp` in the examples folder for an example of key input processing.
+
+The UI is currently under construction and this README will be updated as soon as something tangible is done.

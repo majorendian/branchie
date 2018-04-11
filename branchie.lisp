@@ -312,11 +312,6 @@
 ;https://stackoverflow.com/questions/29721699/common-lisp-function-that-deletes-the-element-at-the-n-th-position-of-each-sub-l
 ;Author: Sylwester
 ;Profile: https://stackoverflow.com/users/1565698/sylwester
-(defun remove-nth (n l)
-  (declare (type fixnum n) (type list l))
-  "Remove N-th element from list L by copying
-   everything except the N-th element."
-  (nconc (subseq l 0 n) (nthcdr (1+ n) l)))
 ;-----------------------------------------------
 
 (defun remove-nth-branch-opt (n branch)

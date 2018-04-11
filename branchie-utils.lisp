@@ -6,11 +6,11 @@
 
 (in-package :branchie-utils)
 
-
-(defun split-string (str &optional (c #\Space))
-  (if (position c str)
-    (cons (subseq str 0 (position c str)) (split-string (subseq str (+ 1 (position c str)))))
-    (cons str nil)))
+(defun remove-nth (n l)
+  (declare (type fixnum n) (type list l))
+  "Remove N-th element from list L by copying
+   everything except the N-th element."
+  (nconc (subseq l 0 n) (nthcdr (1+ n) l)))
 
 (defun join (sep l)
   (declare (type list l))

@@ -1,0 +1,3 @@
+[submodule "ltk"]
+	path = ltk
+	url = git@github.com:majorendian/ltk.git

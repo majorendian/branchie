@@ -1,6 +1,6 @@
 
 (defpackage :branchie-core
-  (:use :cl)
+  (:use :cl :cl-conspack)
   (:export branch
            branch-options
            branch-text
@@ -12,6 +12,10 @@
            advance-branch
            term-loop
            quit
+           set-glob-var
+           get-glob-var
+           save-game-state
+           load-game-state
            ))
 
 (in-package :branchie-core)
@@ -25,6 +29,36 @@
 (defun quit (&optional b input)
   (declare (ignore b) (ignore input))
   nil)
+
+(defparameter *game-state* (make-hash-table))
+
+(defun set-glob-var (varname value)
+  "Set a global variable with name VARNAME and value VALUE."
+  (setf (gethash varname *game-state*) value))
+
+(defun get-glob-var (varname)
+  "Get the value of a global variable with VARNAME."
+  (gethash varname *game-state*))
+
+(defun save-game-state (cur_b &optional (save_name *gametitle*))
+  ;(setf (gethash 'current-branch *global-game-state*) branch_name)
+  (with-open-file (str (savefile save_name)
+                       :direction :output
+                       :if-exists :supersede
+                       :if-does-not-exist :create
+                       :element-type '(unsigned-byte 8))
+
+    (write-sequence (conspack:encode *game-state*) str)))
+
+(defun load-game-state (&optional (save_name *gametitle*))
+  (with-open-file (str (savefile save_name)
+                       :direction :input
+                       :element-type '(unsigned-byte 8))
+    (let ((save_state_array (make-array (file-length str) :element-type '(unsigned-byte 8))))
+      (read-sequence save_state_array str)
+      (let ((loaded_game_state_hash (conspack:decode save_state_array)))
+        (setf *game-state* (copy-hash-table loaded_game_state_hash))
+        ))))
 
 ;The branch table is responsible for keeping track of branches
 ;for cross-referencing

@@ -19,13 +19,14 @@
                (parse-integer (cget canvas :width)) (parse-integer (cget canvas :height))
                ))
 
-(defun draw-text (canvas posx posy text &optional (border-func (lambda (x y) (declare (ignore x) (ignore y)))))
+(defun draw-text (canvas posx posy text &key (border-func (lambda (x y) (declare (ignore x) (ignore y)))) (anchor :nw))
   (funcall border-func posx posy)
   (format-wish "set _canvas_text \"~a\"~%
-               ~a create text ~a ~a -anchor nw -font \"Monospace\" -fill white -text $_canvas_text"
+               ~a create text ~a ~a -anchor ~a -font \"Monospace\" -tags text -fill white -text $_canvas_text"
                text
                (widget-path canvas)
                posx posy
+               (string-downcase anchor )
                ))
 
 (defun setup-textarea (master rows columns)
@@ -130,22 +131,27 @@
 
 (defun get-textarea () nil)
 (defun get-canvas () nil)
-(defun draw-textarea (main-canvas textarea)
-  (create-window main-canvas
-                 (/ (parse-integer (cget main-canvas :width)) 2)
-                 (parse-integer (cget main-canvas :height)) textarea :anchor :s))
+(defun draw-textarea (main-canvas textarea &optional x y &key anchor)
+  (if (and x y) 
+    (create-window main-canvas x y textarea :anchor anchor)
+    (create-window main-canvas
+                   (/ (parse-integer (cget main-canvas :width)) 2)
+                   (parse-integer (cget main-canvas :height)) textarea :anchor :s)))
 
 (defun GUI (width height &key
                   (on-key (lambda (keychar) (format t "~a pressed~%" keychar)))
                   (on-init (lambda ()))
                   (on-update nil)
-                  (update-interval 1))
+                  (update-interval 1)
+                  )
   (with-ltk ()
     (minsize *tk* width height)
     (setup-font)
     (let* ((outside-frame (make-instance 'frame :master *tk*))
            (main-canvas (setup-canvas outside-frame width height))
-           (main-text (setup-textarea main-canvas 4 100)))
+           (main-text (setup-textarea main-canvas 
+                                      (floor (/ (parse-integer (cget main-canvas :height)) 100))
+                                      (floor (/ (parse-integer (cget main-canvas :width)) 10)))))
       (stylize-ui (textbox main-text))
       (clear-canvas main-canvas)
       (pack outside-frame :fill :x :expand t)

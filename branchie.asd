@@ -18,4 +18,5 @@
                (:file "branchie-tiny-ui" :depends-on ("branchie-core"))
                (:file "branchie-utils")
                (:file "branchie-sound")
+               (:file "branchie-ta" :depends-on ("branchie-core" "branchie-tiny-ui"))
                ))

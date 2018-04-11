@@ -6,7 +6,9 @@
            branch-text
            branch-code
            branch-name
+           branch-next
            br
+           lookup-branch-name
            process-branch
            process-selection
            advance-branch
@@ -40,9 +42,9 @@
   "Get the value of a global variable with VARNAME."
   (gethash varname *game-state*))
 
-(defun save-game-state (cur_b &optional (save_name *gametitle*))
+(defun save-game-state (cur_b file)
   ;(setf (gethash 'current-branch *global-game-state*) branch_name)
-  (with-open-file (str (savefile save_name)
+  (with-open-file (str file
                        :direction :output
                        :if-exists :supersede
                        :if-does-not-exist :create
@@ -50,8 +52,8 @@
 
     (write-sequence (conspack:encode *game-state*) str)))
 
-(defun load-game-state (&optional (save_name *gametitle*))
-  (with-open-file (str (savefile save_name)
+(defun load-game-state (file)
+  (with-open-file (str file
                        :direction :input
                        :element-type '(unsigned-byte 8))
     (let ((save_state_array (make-array (file-length str) :element-type '(unsigned-byte 8))))
@@ -64,21 +66,27 @@
 ;for cross-referencing
 (defparameter *branch-table* (make-hash-table))
 
+(defmethod lookup-branch-name ((name symbol))
+  (gethash name *branch-table*))
+
 (defclass branch ()
   ((options :accessor branch-options :initarg :options :initform (list))
    (text :accessor branch-text :initarg :text :initform "...")
    (code :accessor branch-code :initarg :code :initform (lambda (b input) (declare (ignore b) (ignore input)) t))
-   (name :accessor branch-name :initarg :name :initform 'default-branch-name)))
+   (name :accessor branch-name :initarg :name :initform 'default-branch-name)
+   (next :accessor branch-next :initarg :next :initform nil)))
 
 (defun br (text &key 
                 (options nil) 
                 (name 'default-branch-name) 
-                (code (lambda (b input) (declare (ignore b) (ignore input)) t)))
+                (code (lambda (b input) (declare (ignore b) (ignore input)) t))
+                (next nil))
   (let ((b (make-instance 'branch
                           :text text 
                           :options options
                           :name name
-                          :code code)))
+                          :code code
+                          :next next)))
     (setf (gethash name *branch-table*) b)))
 
 (defun print-branch-to-terminal (b)

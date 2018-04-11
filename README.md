@@ -53,6 +53,7 @@ The function has the following usage
                 (list "Option2 text" (br ...))
     :code (lambda (current_branch userinput) ...)
     :name 'branch-name-for-jump-reference
+    :next (or 'branch-name next-branch)
 ```
 It should be self-explanatory. The `:options` key takes a list of pairs which are also lists. The first element is the text of the option and the second is either a branch or a branch name such as 'start-branch or 'quit-branch or as in the above example 'branch-name-for-jump-reference.
 
@@ -62,8 +63,10 @@ The `:code` key defines a function to be run after the player enters the branch.
 
 The `:name` key defines the name of the branch to be used for refrencing when jumping. In the *hello world* example a simple 'quit-branch is defined for program exit so that we don't have to write it again.
 
+The `:next` key defines the next branch to go to when no options are available and the player presses
+the ENTER key. Only available for UI text-adventure loop. See bellow.
 
-## The UI
-The UI allows for more interaction then just reading a line from the terminal such as processing key inputs. Look at `uiexample.lisp` in the examples folder for an example of key input processing.
-
-The UI is currently under construction and this README will be updated as soon as something tangible is done.
+## The LTK-based interface
+For the UI there is a separate package called `branchie-ta` which defines a `(ta-loop ...)` function that basicaly does the same as the the terminal based one except it is in a separate window and allows for
+interesting drawing operations and basically the whole canvas is available. It also provides handling functions for the `:next` key which just advances the text in case one wants to separate the text in pages.
+See `textadventure-example.lisp` in the examples folder for a demonstration of what you can do with it and how simple it actually is.

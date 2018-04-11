@@ -1,6 +1,6 @@
 
 (defpackage :branchie-core
-  (:use :cl :cl-conspack)
+  (:use :cl :conspack)
   (:export branch
            branch-options
            branch-text

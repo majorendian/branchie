@@ -34,7 +34,7 @@ The example should then just load and you should either see something on your te
 ## Simple example
 To get a really good idea of how this actually works, take a look at the file `examples/textadventure-example.lisp` which demonstrates the very basic idea behind this engine. Here is a screenshot of it.
 
-![Screenshot](https://github.com/majorendian/branchie/tree/master/examples/textadventure-example.png)
+![Screenshot](https://github.com/majorendian/branchie/blob/master/examples/textadventure-example.png)
 
 
 ## Terminal-based Hello World example

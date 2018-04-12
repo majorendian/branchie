@@ -1,16 +1,41 @@
 
 # Branchie
-Branchie is a simple 2D game engine.  
+Branchie is a simple 2D branch-based game engine.  
 The UI relies heavily on Tcl/Tk as it's back-bone for graphics "rendering" because it already provides
-all the widgets one could possibly want. The only problem is multithreading so if you want to use the UI provided you will need to get my fork of LTK which enables multiple threads to send commands to `wish`.
-You can find the **fork** here: [majorendian/ltk](https://github.com/majorendian/ltk)  
-If you wish to take a look at the original source, you can find it here: [herth/ltk](https://github.com/herth/ltk)
+all the widgets one could possibly want. The only problem is multithreading so if you want to use the UI provided you will need to use my fork of LTK which enables multiple threads to send commands to `wish`.
+The fork is provided as a submodule in this repository.  
+If you wish to take a look at the original source of LTK, you can find it here: [herth/ltk](https://github.com/herth/ltk)
 
-To best understand what is meant by this, have a look at the examples in the examples folder.
+## Installation
+*  Make sure you have [quicklisp](https://www.quicklisp.org/beta/) installed
+*  Clone the repository with  
+    `git clone --recursive git@github.com:majorendian/branchie.git`
+    
+*  You need to make sure your SBCL installation knows about the module and the submodule.  
+   To do this add the following
+    to your `.sbclrc` file. *(Note the `/` at the end of the pathname to the cloned repo.)*
+```common-lisp
+(setf asdf:*central-registry*
+    (list*
+        '*default-pathname-defaults*
+        #p"/path/to/branchie/"
+        #p"/path/to/branchie/ltk/ltk/"
+        asdf:*central-registry*))
+```
+* Install the dependencies. Simply run the script provied with `sbcl --script install-dependencies.lisp`
+  This will use `quicklisp` to download all the modules the engine depends on.
+
 
 ## Running the examples
 To run any of the examples in the *examples* folder, go into that folder and type `sbcl --load example-file.lisp`  
 The example should then just load and you should either see something on your terminal or a window should pop up based on the example.
+
+
+## Simple example
+To get a really good idea of how this actually works, take a look at the file `examples/textadventure-example.lisp` which demonstrates the very basic idea behind this engine. Here is a screenshot of it.
+
+![Screenshot](https://github.com/majorendian/branchie/tree/master/examples/textadventure-example.png)
+
 
 ## Terminal-based Hello World example
 A trivial example of a terminal-based branchie game would be as following:
@@ -65,8 +90,3 @@ The `:name` key defines the name of the branch to be used for refrencing when ju
 
 The `:next` key defines the next branch to go to when no options are available and the player presses
 the ENTER key. Only available for UI text-adventure loop. See bellow.
-
-## The LTK-based interface
-For the UI there is a separate package called `branchie-ta` which defines a `(ta-loop ...)` function that basicaly does the same as the the terminal based one except it is in a separate window and allows for
-interesting drawing operations and basically the whole canvas is available. It also provides handling functions for the `:next` key which just advances the text in case one wants to separate the text in pages.
-See `textadventure-example.lisp` in the examples folder for a demonstration of what you can do with it and how simple it actually is.

@@ -7,6 +7,8 @@
   (:export ta-loop))
 (in-package :branchie-ta)
 
+(defparameter *text-speed* 100)
+
 (defun init-keymap ()
   (let ((keymap (make-hash-table)))
     (setf (gethash (intern "KP_1") keymap) 0)
@@ -63,7 +65,7 @@
              :anchor :nw))
 
 (defun display-branch-text (cur_b)
-  (set-textarea-text (get-textarea) (branch-text cur_b)))
+  (set-textarea-text (get-textarea) (branch-text cur_b) nil *text-speed*))
 
 
 (defun init-elements ()
@@ -82,9 +84,11 @@
   (display-branch-text abranch)
   (display-branch-options-right abranch))
 
-(defun ta-loop (width height start_branch)
+(defun ta-loop (width height start_branch &key
+                      (text-speed 100))
   (let ((active_branch start_branch)
         (keymap (init-keymap)))
+    (setf *text-speed* text-speed)
     (gui width height
          :on-init (lambda ()
                     (init-elements)

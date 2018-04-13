@@ -4,10 +4,14 @@
         :branchie-tiny-ui
         :branchie-utils
         :ltk)
-  (:export ta-loop))
+  (:export ta-loop
+           *text-speed*
+           *process-input-key*
+           image-canvas))
 (in-package :branchie-ta)
 
 (defparameter *text-speed* 100)
+(defparameter *process-input-key* t)
 
 (defun init-keymap ()
   (let ((keymap (make-hash-table)))
@@ -85,21 +89,32 @@
   (display-branch-options-right abranch))
 
 (defun ta-loop (width height start_branch &key
+                      (on-pre-init (lambda ()))
+                      (on-post-init (lambda ()))
+                      (on-update nil)
+                      (on-key (lambda (keystring) (declare (ignore keystring))))
+                      (on-branch-jump (lambda (b) (declare (ignore b))))
                       (text-speed 100))
   (let ((active_branch start_branch)
         (keymap (init-keymap)))
     (setf *text-speed* text-speed)
     (gui width height
          :on-init (lambda ()
+                    (funcall on-pre-init)
                     (init-elements)
+                    (funcall on-post-init)
                     (funcall (branch-code active_branch) active_branch "") 
                     (display-branch-text active_branch)
                     (display-branch-options-right active_branch))
+         :on-update on-update
          :on-key (lambda (key)
-                   (let ((next_branch (process-selection active_branch (lookup-key keymap key))))
+                   (funcall on-key key)
+                   (when *process-input-key*
+                    (let ((next_branch (process-selection active_branch (lookup-key keymap key))))
                      (if next_branch
                        (progn
                          (display-branch next_branch key)
+                         (funcall on-branch-jump next_branch)
                          (setf active_branch next_branch))
                        (when (and
                                (branch-next active_branch)
@@ -111,4 +126,5 @@
                              ((typep (branch-next active_branch) 'branch) (setf next_branch (branch-next active_branch)))
                              (t (error "Invalid type for :next keyword")))
                            (display-branch next_branch key)
-                           (setf active_branch next_branch)))))))))
+                           (funcall on-branch-jump next_branch)
+                           (setf active_branch next_branch))))))))))

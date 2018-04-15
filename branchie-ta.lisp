@@ -88,6 +88,29 @@
   (display-branch-text abranch)
   (display-branch-options-right abranch))
 
+(defun handle-key (key keymap active_branch 
+                       &key
+                       (on-branch-jump (lambda (b) (declare (ignore b)))))
+  (let ((next_branch (process-selection active_branch (lookup-key keymap key))))
+    (if next_branch
+      (progn
+        (display-branch next_branch key)
+        (funcall on-branch-jump next_branch)
+        (setf active_branch next_branch))
+      (if (and
+            (branch-next active_branch)
+            (or (string= "RETURN" key) (string= "KP_ENTER" key)))
+        (progn
+          (format t "branch-next: ~S~%" (branch-next active_branch))
+          (cond
+            ((symbolp (branch-next active_branch)) (setf next_branch (lookup-branch-name (branch-next active_branch))))
+            ((typep (branch-next active_branch) 'branch) (setf next_branch (branch-next active_branch)))
+            (t (error "Invalid type for :next keyword")))
+          (display-branch next_branch key)
+          (funcall on-branch-jump next_branch)
+          next_branch)
+        active_branch))))
+
 (defun ta-loop (width height start_branch &key
                       (on-pre-init (lambda ()))
                       (on-post-init (lambda ()))
@@ -110,21 +133,4 @@
          :on-key (lambda (key)
                    (funcall on-key key)
                    (when *process-input-key*
-                    (let ((next_branch (process-selection active_branch (lookup-key keymap key))))
-                     (if next_branch
-                       (progn
-                         (display-branch next_branch key)
-                         (funcall on-branch-jump next_branch)
-                         (setf active_branch next_branch))
-                       (when (and
-                               (branch-next active_branch)
-                               (or (string= "RETURN" key) (string= "KP_ENTER" key)))
-                         (progn
-                           (format t "branch-next: ~S~%" (branch-next active_branch))
-                           (cond
-                             ((symbolp (branch-next active_branch)) (setf next_branch (lookup-branch-name (branch-next active_branch))))
-                             ((typep (branch-next active_branch) 'branch) (setf next_branch (branch-next active_branch)))
-                             (t (error "Invalid type for :next keyword")))
-                           (display-branch next_branch key)
-                           (funcall on-branch-jump next_branch)
-                           (setf active_branch next_branch))))))))))
+                     (setf active_branch (handle-key key keymap active_branch)))))))

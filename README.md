@@ -1,6 +1,6 @@
 
 # Branchie
-Branchie is a simple 2D branch-based game engine.  
+Branchie is a simple branch-based text-adventure game engine.  
 The UI relies heavily on Tcl/Tk as it's back-bone for graphics "rendering" because it already provides
 all the widgets one could possibly want. The only problem is multithreading so if you want to use the UI provided you will need to use my fork of LTK which enables multiple threads to send commands to `wish`.
 The fork is provided as a submodule in this repository.  

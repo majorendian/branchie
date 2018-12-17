@@ -79,8 +79,8 @@
                  (floor (/ (parse-integer (cget (get-canvas) :height)) 10))
                  :anchor :nw)
   (configure (textbox (get-textarea))
-             :width (floor (/ (parse-integer (cget (get-canvas) :width)) 12.5))
-             :height (floor (/ (parse-integer (cget (get-canvas) :height)) 20))))
+             :width (floor (/ (parse-integer (cget (get-canvas) :width)) 15))
+             :height (floor (/ (parse-integer (cget (get-canvas) :height)) 25))))
 
 (defun display-branch (abranch key)
   (format-wish "~a delete text" (widget-path (get-canvas)))
